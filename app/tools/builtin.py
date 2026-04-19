@@ -314,28 +314,22 @@ def register_builtin_tools():
         context: Optional[Dict] = None,
     ) -> Dict[str, Any]:
         try:
+            from rg_llm import UnifiedLLMClient, LLMRequest
             messages = []
             if system_prompt:
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": prompt})
 
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    f"{settings.LLM_SERVICE_URL}/llm/chat/completions",
-                    json={
-                        "messages": messages,
-                        "max_tokens": max_tokens,
-                    },
-                    timeout=60.0,
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    return {
-                        "success": True,
-                        "response": data.get("content", ""),
-                        "tokens_used": data.get("usage", {}).get("total_tokens", 0),
-                    }
-                return {"success": False, "error": f"LLM service error: {resp.status_code}"}
+            _client = UnifiedLLMClient()
+            resp = await _client.complete(LLMRequest(
+                messages=messages,
+                max_tokens=max_tokens,
+            ))
+            return {
+                "success": True,
+                "response": resp.content or "",
+                "tokens_used": resp.usage.get("total_tokens", 0) if resp.usage else 0,
+            }
         except Exception as e:
             return {"success": False, "error": str(e)}
 

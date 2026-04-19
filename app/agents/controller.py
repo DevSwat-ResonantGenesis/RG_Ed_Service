@@ -263,22 +263,20 @@ class AgentController:
 
             # Ask LLM what to do
             try:
-                async with httpx.AsyncClient() as client:
-                    resp = await client.post(
-                        f"{settings.LLM_SERVICE_URL}/llm/agent/run",
-                        json={
-                            "messages": agent.message_history,
-                            "tools": available_tools,
-                            "max_iterations": 1,
-                        },
-                        headers={"x-user-id": context.get("user_id", "")},
-                        timeout=60.0,
-                    )
-
-                    if resp.status_code != 200:
-                        raise Exception(f"LLM service error: {resp.status_code}")
-
-                    llm_response = resp.json()
+                from rg_llm import UnifiedLLMClient, LLMRequest
+                _ed_llm = UnifiedLLMClient()
+                _resp = await _ed_llm.complete(LLMRequest(
+                    messages=agent.message_history,
+                    tools=available_tools,
+                    max_tokens=4096,
+                ))
+                llm_response = {
+                    "content": _resp.content or "",
+                    "tool_calls": [
+                        {"id": tc.id, "name": tc.name, "arguments": tc.arguments}
+                        for tc in (_resp.tool_calls or [])
+                    ],
+                }
 
             except Exception as e:
                 # Fallback: simple execution without LLM planning
